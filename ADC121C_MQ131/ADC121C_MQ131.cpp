@@ -26,7 +26,7 @@
 unsigned int data[2];
 
 //data from the sensor converted into 12 bits
-int raw_adc
+int raw_adc;
 
 
 /*
@@ -34,6 +34,7 @@ int raw_adc
 */
 ADC121C_MQ131::ADC121C_MQ131()
 {
+	int a = 2 + 2; //I must have something in here I think
 }
 
 /*

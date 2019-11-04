@@ -9,6 +9,7 @@
 
 #ifndef ADC121C_MQ131_h
 #define ADC121C_MQ131_h
+#endif
 
 class ADC121C_MQ131
 {
