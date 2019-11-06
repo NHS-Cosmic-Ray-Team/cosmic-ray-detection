@@ -64,6 +64,7 @@ configure MDR1                                        0000 0000 --> 0x00
 #include <SoftwareSerial.h>
 #include <Adafruit_BME280.h>
 #include <TinyGPS_modded.h>
+#include <Adafruit_sensor.h>
 
 
 #define GPS_RMC       "$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n"
@@ -212,14 +213,10 @@ void checkVoltage() // Analog to Digital Converter
 {
   // read the input on analog pin 0:
   int analogValue1 = analogRead(A0);
-  int analogValue2 = analogRead(A1);
   // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V):
   float voltage1 = analogValue1 * (5.0 / 1023.0);
-  float voltage2 = analogValue2 * (5.0 / 1023.0);
   // print out the value you read:
-  Serial.print(voltage1);
-  Serial.print(",");
-  Serial.println(voltage2); 
+  Serial.println(voltage1);
 }
 
 void setup()

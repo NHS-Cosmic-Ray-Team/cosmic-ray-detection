@@ -1,3 +1,52 @@
+                                                                                                                                                                                                           /*@authors - TK Doe, Joe Sundermier
+  @date - August 1, 2017
+  @version - most updated code
+ 
+Reads the muons coincidence from encoder, RMC and GGA sentences from GPS shield and data from BME 
+sensor at a minute intervals (can be changed to anytime), using the GPS as a timer. 
+The analog input voltages supplied to the scintillators are also read in and monitored. 
+We also calculate the latency between the satelites and our GPS sensor.Data is written to the 
+serial monitor to be saved on the raspberry pi. The counter (discriminator shield) is connected 
+to two scintilators configured as a cosmic ray telescope.
+
+NOTE: There's no longer a neeed to import the GPS and BME280 libraries.
+      The needed functions from these libraries are included in this code 
+      as subroutines to save memory.
+
+Timer: To test whether the TinyGPS object contains valid fix data, pass the address of an unsigned 
+       long variable for the “fix_age” parameter in the methods that support it. 
+       If the returned value is GPS_INVALID_AGE, then you know the object has never received a valid fix. 
+       If not, then fix_age is the number of milliseconds since the last valid fix. 
+       Since we are feeding the object regularly, fix_age should NOT get much over 1000. If fix_age starts getting large, 
+       that may be a sign that you once had a fix, but have lost it.
+
+       To get the best results, we first check to validate that the GPS has a fix before any data is logged
+       
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+ Avoid pin conflict || Please follow all connection/pin configurations in setup
+-------------------------------------------------------------------------------
+SPI connect counter
+I2C connect BME280
+   
+            MOSI   -------------------   SDO (D11)
+            MISO   -------------------   SDI (D12)
+            SCK    -------------------   SCK (D13)
+            SS1    -------------------   SS1 (D9)
+            GND    -------------------   GND
+            VDD    -------------------   VCC (5.0V)
+            A(12)  -------------------   Signal
+            B(11)  -------------------   tie to logic high for up count
+            I(10)  -------------------   tie to +V
+            A(0)   -------------------   Analog Voltage 1
+            A(1)   -------------------   Analog Voltage 2
+            D(2)   -------------------   1PPS on GPS Shield
+            
+This is probably not necessary since the LS7366 starts up in this mode:
+configure MDR0 into non-quadrature, free runnig mode  0000 0000 --> 0x00
+configure MDR1                                        0000 0000 --> 0x00
+
+*/
 #include "Arduino.h"
 #include <Wire.h>
 #include <SPI.h>
@@ -464,6 +513,23 @@ class myGPS
       if (age) *age = _last_time_fix == GPS_INVALID_FIX_TIME ?
                         GPS_INVALID_AGE : millis() - _last_time_fix;
     }
+void crack_datetime(int *year, byte *month, byte *day, 
+  byte *hour, byte *minute, byte *second, byte *hundredths, unsigned long *age)
+{
+  unsigned long date, time;
+  get_datetime(&date, &time, age);
+  if (year) 
+  {
+    *year = date % 100;
+    *year += *year > 80 ? 1900 : 2000;
+  }
+  if (month) *month = (date / 100) % 100;
+  if (day) *day = date / 10000;
+  if (hour) *hour = time / 1000000;
+  if (minute) *minute = (time / 10000) % 100;
+  if (second) *second = (time / 100) % 100;
+  if (hundredths) *hundredths = time % 100;
+}
 
   private:
     enum {_GPS_SENTENCE_GPRMC, _GPS_SENTENCE_GPGGA, _GPS_SENTENCE_OTHER};
@@ -663,10 +729,8 @@ unsigned long signal_1pps;
 unsigned long latency;
 
 bool newData = false;
-int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0, oldSecond = -1, flag = 0, oldMinute = -1;
 signed long count = 0;
-int lock_minute = -1;
-
+int second = 0,flag = 0, lock_minute = -1, oldSecond = -1, oldMinute = -1;
 //---------------------------------------Subroutines-------------------------------------
 void readGPS()
 {
@@ -728,57 +792,21 @@ void barometer()  /*subroutine for barometer sensor */
   Serial.print(bme.readHumidity());
 }
 
+static void print_date(myGPS &gps)
+{
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  unsigned long age;
+  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
+    char sz[36];
+    sprintf(sz, "%02d%02d%02d,%02d%02d%02d.%02d",
+        year, month, day, hour, minute, second, hundredths);
+    Serial.print(sz);
+}
+
 void outputData()
 {
-  year = gpsDate % 100 + 2000;
-  month = (gpsDate / 100) % 100;
-  day = gpsDate / 10000;
-  hour = gpsTime / 1000000;
-  minute = (gpsTime / 10000) % 100;
-  second = (gpsTime / 100) % 100;
-
-  Serial.print(year);
-  if (month < 10)
-  {
-    Serial.print("0");Serial.print(month);
-  }
-  else
-  {
-    Serial.print(month);
-  }
-  if (day < 10)
-  {
-    Serial.print("0");Serial.print(day);
-  }
-  else
-  {
-    Serial.print(day);
-  }
-  Serial.print(",");
-  if (hour < 10)
-  {
-    Serial.print("0");Serial.print(hour);
-  }
-  else
-  {
-    Serial.print(hour);
-  }
-  if (minute < 10)
-  {
-    Serial.print("0");Serial.print(minute);
-  }
-  else
-  {
-    Serial.print(minute);
-  }
-  if (second < 10)
-  {
-    Serial.print("0");Serial.print(second);
-  }
-  else
-  {
-    Serial.print(second);
-  }
+  print_date(gps);
   Serial.print(",");
 
   count = readCounter(); //calls subroutine to reac the counter
@@ -792,15 +820,23 @@ void outputData()
   barometer();
 
   Serial.print(",");
-  Serial.print((lat / 1000000.0));// print latitude
+  Serial.print((lat / 1000000.0), 3);// print latitude
   Serial.print(",");
-  Serial.print((lon / 1000000.0));
+  Serial.print((lon / 1000000.0), 3);
   Serial.print(",");
   Serial.print(gps.satsinview());
   Serial.print(",");
   Serial.print(gps.fix_Quality());
   Serial.print(",");
-  Serial.println((latency / 1000.0));
+  Serial.print((latency / 1000.0));
+  if ((latency / 1000.0) > 350) // this is to check if the GPS resets to 1Hz update rate and sets it back to the desired 5Hz update rate
+  {
+      ss.print(GPS_RMC);
+      ss.print(GPS_RMCGGA);
+      ss.print(GPS_5Hz);
+  }
+  Serial.print(",");
+  checkVoltage();
 
   oldSecond = second;
 }
@@ -809,6 +845,20 @@ void one_pps()
 {
   signal_1pps = micros();
   flag = 0;
+}
+
+void checkVoltage() // Analog to Digital Converter
+{
+  // read the input on analog pin 0:
+  int analogValue1 = analogRead(A0);
+  int analogValue2 = analogRead(A1);
+  // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V):
+  float voltage1 = analogValue1 * (5.0 / 1023.0);
+  float voltage2 = analogValue2 * (5.0 / 1023.0);
+  // print out the value you read:
+  Serial.print(voltage1);
+  Serial.print(",");
+  Serial.println(voltage2); 
 }
 
 void setup()
@@ -829,7 +879,7 @@ void setup()
     while (1);
   }
   pinMode(10, OUTPUT);
-  Serial.println("Date,Time,Count,TempC,Pressure,Hmdty,Lat,Lon,Numsats,FixQ,Latency");
+  Serial.println("Date,Time,Count,TempC,Pressure,Humidity,Lat,Lon,Numsats,FixQ,Latency,V1,V2");
   attachInterrupt(0, one_pps, RISING); //1PPS signal to pin 2, rising signal.
 }
 
@@ -838,25 +888,23 @@ void loop()
   readGPS();
   gps.get_datetime(&gpsDate, &gpsTime, &gpsAge);
   gps.get_position(&lat, &lon, &gpsAge);
-  minute = (gpsTime / 10000) % 100;
-  hour = gpsTime / 1000000;
+  int minute = (gpsTime / 10000) % 100;
+  int hour = gpsTime / 1000000;
   int index = (hour * 60) + minute;
 
-  if (gpsAge <= 1000)
+  if (gpsAge <= 1000) //To test whether the data returned is stale: fix_age returns the number of milliseconds since the data was encoded.
   {
     if ((index == 0) && (minute != lock_minute)) //check that it's midnight
     {
       lock_minute = minute;
-      Serial.println("Date,Time,Count,TempC,Pressure,Hmdty,Lat,Lon,Numsats,FixQ,Latency");
+      Serial.println("Date,Time,Count,TempC,Pressure,Humidity,Lat,Lon,Numsats,FixQ,Latency,V1,V2");
       outputData();
     }
-
-    if ((index % 1 == 0) && (minute != lock_minute))//check that minute is 5
+    if ((index % 1 == 0) && (minute != lock_minute)) //check that minute is 5
     {
       lock_minute = minute;
       outputData();
     }
   }
-
 }
 
