@@ -3,8 +3,8 @@
 
     A library for any external classes that are used in the base cosmic ray code.
     It includes modified versions of:
-        -TinyGPS            https://github.com/mikalhart/TinyGPS
         -AdaFruit_BME280    https://github.com/adafruit/Adafruit_BME280_Library
+		-TinyGPS            https://github.com/mikalhart/TinyGPS
 
     DISCLAIMER:
     I am just repackaging existing code from TK Doe and Joe Sundermier. I take
@@ -164,49 +164,6 @@ class myBME280 {
     int32_t   t_fine;
 
     bme280_calib_data _bme280_calib;
-
-    // The config register
-    struct config {
-      unsigned int t_sb : 3;
-      unsigned int filter : 3;
-
-      // unused - don't set
-      unsigned int none : 1;
-
-      unsigned int get() {
-        return (t_sb << 5) | (filter << 3);
-      }
-    };
-    config _configReg;
-
-    // The ctrl_meas register
-    struct ctrl_meas {
-      unsigned int osrs_t : 3;
-
-      // pressure oversampling
-      unsigned int osrs_p : 3;
-
-      // device mode
-      unsigned int mode : 2;
-
-      unsigned int get() {
-        return (osrs_t << 5) | (osrs_p << 3) | mode;
-      }
-    };
-    ctrl_meas _measReg;
-
-    // The ctrl_hum register
-    struct ctrl_hum {
-      // unused - don't set
-      unsigned int none : 5;
-
-      // pressure oversampling
-      unsigned int osrs_h : 3;
-      unsigned int get() {
-        return (osrs_h);
-      }
-    };
-    ctrl_hum _humReg;
 
     //Reads the factory-set coefficients
     void readCoefficients(void)

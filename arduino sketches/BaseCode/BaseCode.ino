@@ -1,6 +1,5 @@
-                                                                                                                                                                                                           /*@authors - TK Doe, Joe Sundermier
-  @date - August 1, 2017
-  @version - most updated code
+/*@authors - TK Doe, Joe Sundermier, Kyle Mitard
+  @date - 11 November 2019
  
 Reads the muons coincidence from encoder, RMC and GGA sentences from GPS shield and data from BME 
 sensor at a minute intervals (can be changed to anytime), using the GPS as a timer. 
@@ -10,8 +9,8 @@ serial monitor to be saved on the raspberry pi. The counter (discriminator shiel
 to two scintilators configured as a cosmic ray telescope.
 
 NOTE: There's no longer a neeed to import the GPS and BME280 libraries.
-      The needed functions from these libraries are included in this code 
-      as subroutines to save memory.
+      The needed functions from these libraries are included in the
+	  CosmicRayExtras library included with this code.
 
 Timer: To test whether the TinyGPS object contains valid fix data, pass the address of an unsigned 
        long variable for the “fix_age” parameter in the methods that support it. 
