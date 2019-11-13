@@ -59,7 +59,11 @@ configure MDR1                                        0000 0000 --> 0x00
 
 */
 
+#include <Wire.h>
+#include <SPI.h>
+#include <SoftwareSerial.h>
 #include "CosmicRayExtras.h"
+
 #include "ADC121C_MQ131.h"
 #include "SparkFun_MAG3110.h"
 

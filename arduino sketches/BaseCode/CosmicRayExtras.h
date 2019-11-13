@@ -101,7 +101,7 @@ public:
     };
   
 	myBME280();
-	bool begin();
+	bool begin(uint8_t addr = BME280_ADDRESS);
 	void setSampling(sensor_mode mode  = MODE_NORMAL,
 					sensor_sampling tempSampling  = SAMPLING_X16,
 					sensor_sampling pressSampling = SAMPLING_X16,
@@ -196,6 +196,12 @@ private:
 class myGPS
 {
 public:
+  enum
+  {
+    GPS_INVALID_AGE = 0xFFFFFFFF,      GPS_INVALID_ANGLE = 999999999,
+    GPS_INVALID_DATE = 0,              GPS_INVALID_TIME = 0xFFFFFFFF,
+    GPS_INVALID_FIX_TIME = 0xFFFFFFFF, GPS_INVALID_SATELLITES = 0XFF
+  };
 	myGPS();
 	unsigned char satsinview();
 	unsigned char fix_Quality();
@@ -206,24 +212,26 @@ public:
 						byte *hour, byte *minute, byte *second, byte *hundredths, unsigned long *age);
 	
 private:
+  enum {_GPS_SENTENCE_GPRMC, _GPS_SENTENCE_GPGGA, _GPS_SENTENCE_OTHER};
+
 	// properties
 	unsigned long _time, _new_time;
-    unsigned long _date, _new_date;
-    long _latitude, _new_latitude;
-    long _longitude, _new_longitude;
-    unsigned long _last_time_fix, _new_time_fix;
-    unsigned long _last_position_fix, _new_position_fix;
-    unsigned short _numsats, _new_numsats;
-    unsigned short _fixquality, _new_fixquality;
+  unsigned long _date, _new_date;
+  long _latitude, _new_latitude;
+  long _longitude, _new_longitude;
+  unsigned long _last_time_fix, _new_time_fix;
+  unsigned long _last_position_fix, _new_position_fix;
+  unsigned short _numsats, _new_numsats;
+  unsigned short _fixquality, _new_fixquality;
 
 	// parsing state variables
 	byte _parity;
-    bool _is_checksum_term;
-    char _term[15];
-    byte _sentence_type;
-    byte _term_number;
-    byte _term_offset;
-    bool _gps_data_good;
+  bool _is_checksum_term;
+  char _term[15];
+  byte _sentence_type;
+  byte _term_number;
+  byte _term_offset;
+  bool _gps_data_good;
 
 	// methods
 	int from_hex(char a);

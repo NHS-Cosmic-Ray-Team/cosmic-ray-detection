@@ -48,6 +48,9 @@ configure MDR1                                        0000 0000 --> 0x00
 */
 
 #include "CosmicRayExtras.h"
+#include <Wire.h>
+#include <SPI.h>
+#include <SoftwareSerial.h>
 
 myBME280 bme; // I2C
 myGPS gps;
