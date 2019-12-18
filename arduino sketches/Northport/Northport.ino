@@ -66,6 +66,7 @@ configure MDR1                                        0000 0000 --> 0x00
 
 #include "ADC121C_MQ131.h"
 #include "SparkFun_MAG3110.h"
+#include <EEPROM.h>
 
 myBME280 bme; // I2C
 myGPS gps;
@@ -257,6 +258,7 @@ void setup()
   ozone.begin();
   mag.initialize();
   mag.start();
+  importMagCalibrationData();
 }
 
 void loop()
@@ -284,3 +286,52 @@ void loop()
   }
 }
 
+
+//EXTRA MAGNETOMETER METHODS ----------------------------------------------------------------------------
+
+// imports calibration data from bytes 4 through 9
+void importMagCalibrationData()
+{
+  int xOffset = readNum(4);
+  mag.setOffset(MAG3110_X_AXIS, xOffset);
+  
+  int yOffset = readNum(7);
+  mag.setOffset(MAG3110_Y_AXIS, yOffset);
+}
+
+// writes a calibration number to 3 EEPROM slots by treating
+// each slot as a digit of a base-256 number system
+void writeNum(int n, int firstByte)
+{
+  
+  //first slot: 1 if negative, 0 if positive
+  if (n < 0)
+  {
+    EEPROM.write(firstByte, 1);
+  }
+  else
+  {
+    EEPROM.write(firstByte, 0);
+  }
+  
+  EEPROM.write(firstByte + 1, n / 256);
+  
+  EEPROM.write(firstByte + 2, n % 256);
+}
+
+//reads a calibration number from the EEPROM as it was written (see writeNum() above)
+int readNum(int firstByte)
+{
+  int n = 0;
+  
+  n = n + EEPROM.read(firstByte + 2);
+  n = n + 256 * EEPROM.read(firstByte + 1);
+  
+  //if the first byte is 1, the number is negative
+  if (EEPROM.read(firstByte) == 1)
+  {
+    n = n * -1;
+  }
+  
+  return n;
+}
