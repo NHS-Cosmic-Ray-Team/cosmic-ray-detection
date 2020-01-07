@@ -212,15 +212,20 @@ void checkVoltage() // Analog to Digital Converter
 {
   // read the input on analog pin 0:
   int analogValue0 = analogRead(A0);
+
   // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V):
   double voltage0 = analogValue0 * (5.0 / 1023.0);
+
   // convert analog voltage to CO2 concentration in ppm
   double co2_ppm = (voltage0 - 0.4) * 5000.0 / 1.6;
+
   // print out the value
   Serial.print(co2_ppm);
   Serial.print(",");
 }
 
+
+// 
 void readMagnetometer()
 {
   float x, y, z;
@@ -263,11 +268,20 @@ void setup()
 
 void loop()
 {
+  // get data from GPS
   readGPS();
+
+  // date, time, age of data stored in variables gpsDate, gpsTime, gpsAge
   gps.get_datetime(&gpsDate, &gpsTime, &gpsAge);
+  
+  // latitude, longitude, and age (again for some reason) stored in variables lat, lon, gpsAge
   gps.get_position(&lat, &lon, &gpsAge);
+
+  // from time, get hours and minutes
   int minute = (gpsTime / 10000) % 100;
   int hour = gpsTime / 1000000;
+
+  // index of data points, signified by the minutes after midnight
   int index = (hour * 60) + minute;
 
   if (gpsAge <= 1000) //To test whether the data returned is stale: fix_age returns the number of milliseconds since the data was encoded.
