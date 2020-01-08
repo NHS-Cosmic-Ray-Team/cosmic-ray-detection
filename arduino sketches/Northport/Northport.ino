@@ -326,22 +326,19 @@ void loop()
   // index of data points, signified by the minutes after midnight
   int index = (hour * 60) + minute;
 
-  // if the GPS data is not stale (older than 1 second)
-  if (gpsAge <= 1000)
+  // if the GPS data is not stale (older than 1 second) and a minute has passed since last data point was written
+  if ((gpsAge <= 1000) && (minute != lock_minute))
   {
+    lock_minute = minute;
+
     // if it is midnight (i.e. when a new file is created), print out file header
     // this is supposed to put it at the top of the file, although it only works properly when the Raspberry Pi's clock is in perfect sync with the GPS
-    if ((index == 0) && (minute != lock_minute))
+    if ((index == 0) )
     {
-      lock_minute = minute;
       Serial.println(fileHeader);
-      outputData();
     }
-    if ((index % 1 == 0) && (minute != lock_minute))
-    {
-      lock_minute = minute;
-      outputData();
-    }
+
+    outputData();
   }
 }
 
