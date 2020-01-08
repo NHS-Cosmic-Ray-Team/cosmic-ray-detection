@@ -22,7 +22,7 @@ to two scintilators configured as a cosmic ray telescope.
 
 NOTE: There's no longer a neeed to import the GPS and BME280 libraries.
       The needed functions from these libraries are included in the
-	  CosmicRayExtras library included with this code.
+	    CosmicRayExtras library included with this code.
 
 Timer: To test whether the TinyGPS object contains valid fix data, pass the address of an unsigned 
        long variable for the “fix_age” parameter in the methods that support it. 
@@ -68,23 +68,48 @@ configure MDR1                                        0000 0000 --> 0x00
 #include "SparkFun_MAG3110.h"
 #include <EEPROM.h>
 
-myBME280 bme; // I2C
+// weather sensor
+myBME280 bme;
+
+// GPS unit
 myGPS gps;
+
 SoftwareSerial ss(8, 7);
 
-unsigned long gpsDate, gpsTime, gpsAge;
-float flat, flon;
+// data from GPS
+unsigned long gpsDate,  // date in the form yyyymmdd
+              gpsTime,  // time in the form hhmmsscc (retrieved from the GPS, not the Pi, so make sure they are in PERFECT sync with each other!)
+              gpsAge;   // age of GPS data in milliseconds
+
+
+// latitude and longitude in millionths of a degree (this is how the GPS outputs it)
 long int  lat, lon;
+
+// (unsure) length of time in one pulse of data from GPS
 unsigned long signal_1pps;
+
+// latency in getting data from GPS
 unsigned long latency;
 
+// true if new data was recieved from GPS
 bool newData = false;
+
+// number of cosmic rays counted by scintillators
 signed long count = 0;
-int second = 0,flag = 0, lock_minute = -1, oldSecond = -1, oldMinute = -1;
 
-ADC121C_MQ131 ozone();
-MAG3110 mag();
 
+int second = 0,       // don't know
+    flag = 0,         // flag to delay 50 ms after reading GPS when a 1PPS signal is sent for some reason?
+    lock_minute = -1, // the last minute when data was outputted
+    oldSecond = -1;   // don't know
+
+// ozone sensor
+ADC121C_MQ131 ozone;
+
+// magnetometer
+MAG3110 mag;
+
+// header of file, with every field separated by a comma
 const String fileHeader = "Date,Time,Count,TempC,Pressure,Humidity,Lat,Lon,Numsats,FixQ,Latency,CO2,Ozone,magX,magY,magZ";
 
 //---------------------------------------Subroutines-------------------------------------
@@ -271,28 +296,31 @@ void loop()
   // get data from GPS
   readGPS();
 
-  // date, time, age of data stored in variables gpsDate, gpsTime, gpsAge
+  // date (ddmmyy), time (hhmmsscc), age of data (milliseconds) stored in variables gpsDate, gpsTime, gpsAge
   gps.get_datetime(&gpsDate, &gpsTime, &gpsAge);
   
-  // latitude, longitude, and age (again for some reason) stored in variables lat, lon, gpsAge
+  // latitude/longitude (millionths of a degree), and age (again for some reason) stored in variables lat, lon, gpsAge
   gps.get_position(&lat, &lon, &gpsAge);
 
-  // from time, get hours and minutes
+  // from time, get hour and minute
+  // ex: if gpsTime = 231700, minute = 17 and hour = 23
   int minute = (gpsTime / 10000) % 100;
   int hour = gpsTime / 1000000;
 
   // index of data points, signified by the minutes after midnight
   int index = (hour * 60) + minute;
 
-  if (gpsAge <= 1000) //To test whether the data returned is stale: fix_age returns the number of milliseconds since the data was encoded.
+  // if the GPS data is not stale (older than 1 second)
+  if (gpsAge <= 1000)
   {
-    if ((index == 0) && (minute != lock_minute)) //check that it's midnight
+    // if it is midnight (i.e. when a new file is created)
+    if ((index == 0) && (minute != lock_minute))
     {
       lock_minute = minute;
       Serial.println(fileHeader);
       outputData();
     }
-    if ((index % 1 == 0) && (minute != lock_minute)) //check that minute is 5
+    if ((index % 1 == 0) && (minute != lock_minute))
     {
       lock_minute = minute;
       outputData();
