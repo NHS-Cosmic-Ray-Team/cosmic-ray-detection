@@ -77,7 +77,7 @@ myGPS gps;
 SoftwareSerial ss(8, 7);
 
 // data from GPS
-unsigned long gpsDate,  // date in the form yyyymmdd
+unsigned long gpsDate,  // date in the form ddmmyy
               gpsTime,  // time in the form hhmmsscc (retrieved from the GPS, not the Pi, so make sure they are in PERFECT sync with each other!)
               gpsAge;   // age of GPS data in milliseconds
 
@@ -97,7 +97,6 @@ bool newData = false;
 // number of cosmic rays counted by scintillators
 signed long count = 0;
 
-
 int second = 0,       // don't know
     flag = 0,         // flag to delay 50 ms after reading GPS when a 1PPS signal is sent for some reason?
     lock_minute = -1, // the last minute when data was outputted
@@ -112,7 +111,10 @@ MAG3110 mag;
 // header of file, with every field separated by a comma
 const String fileHeader = "Date,Time,Count,TempC,Pressure,Humidity,Lat,Lon,Numsats,FixQ,Latency,CO2,Ozone,magX,magY,magZ";
 
+
 //---------------------------------------Subroutines-------------------------------------
+
+// read a new set of Data from the GPS
 void readGPS()
 {
   while (ss.available()) {
@@ -132,7 +134,9 @@ void readGPS()
   }
 }
 
-void initCounter()  /* initialize the counter */
+
+// initialize the counter
+void initCounter()
 {
   pinMode(9, OUTPUT);
   digitalWrite(9, HIGH);
@@ -146,7 +150,9 @@ void initCounter()  /* initialize the counter */
   digitalWrite(9, HIGH); // bring high to end conversation
 }
 
-long readCounter() /*Reads the Encoders to retrieve the updated value and RETURNS: long */
+
+// Reads the Encoders to retrieve the updated value and RETURNS: long
+long readCounter()
 {
   unsigned int count_1, count_2, count_3, count_4;
   long count_value = 0;
@@ -164,7 +170,9 @@ long readCounter() /*Reads the Encoders to retrieve the updated value and RETURN
   return count_value;
 }
 
-void barometer()  /*subroutine for barometer sensor */
+
+// prints data from weather sensor: temperature, pressure, humidity
+void barometer()
 {
   Serial.print(bme.readTemperature());
   Serial.print(",");
@@ -173,6 +181,8 @@ void barometer()  /*subroutine for barometer sensor */
   Serial.print(bme.readHumidity());
 }
 
+
+// prints out date in the form (yyyymmdd) to the file
 static void print_date(myGPS &gps)
 {
   int year;
@@ -185,12 +195,16 @@ static void print_date(myGPS &gps)
     Serial.print(sz);
 }
 
+
+// takes all data from everything and prints it in the file
 void outputData()
 {
+  // date/time
   print_date(gps);
   Serial.print(",");
 
-  count = readCounter(); //calls subroutine to reac the counter
+  // cosmic ray counter
+  count = readCounter(); //calls subroutine to read the counter
   Serial.print(count);
   Serial.print(",");
 
@@ -198,13 +212,17 @@ void outputData()
   SPI.transfer(0x20); //clears the CNTR
   digitalWrite(9, HIGH); //end SPI conversation
 
+  //weather sensor
   barometer();
 
+  // latitude and longitude (converted to degrees)
   Serial.print(",");
   Serial.print((lat / 1000000.0), 3);// print latitude
   Serial.print(",");
   Serial.print((lon / 1000000.0), 3);
   Serial.print(",");
+
+  // technical GPS stuff
   Serial.print(gps.satsinview());
   Serial.print(",");
   Serial.print(gps.fix_Quality());
@@ -217,23 +235,32 @@ void outputData()
       ss.print(GPS_5Hz);
   }
   Serial.print(",");
+  
+  //CO2 Sensor
   checkVoltage();
 
+  // ozone sensor
   Serial.print(ozone.get_ppm());
   Serial.print(",");
 
+  // magnetometer
   readMagnetometer();
 
+  // I don't know what this does
   oldSecond = second;
 }
 
+
+// (unsure) sets a flag when a 1PPS signal is sent
 void one_pps()
 {
   signal_1pps = micros();
   flag = 0;
 }
 
-void checkVoltage() // Analog to Digital Converter
+
+// reads voltage from CO2 sensor and converts it to ppm using a conversion described by the manufacturer
+void checkVoltage()
 {
   // read the input on analog pin 0:
   int analogValue0 = analogRead(A0);
@@ -250,20 +277,7 @@ void checkVoltage() // Analog to Digital Converter
 }
 
 
-// 
-void readMagnetometer()
-{
-  float x, y, z;
-  
-  mag.readMicroTeslas(&x, &y, &z);
-
-  Serial.print(x);
-  Serial.print(",");
-  Serial.print(y);
-  Serial.print(",");
-  Serial.println(z);
-}
-
+// initializes all sensors and such (runs once when Arduino starts up)
 void setup()
 {
   Serial.begin(9600);
@@ -291,15 +305,17 @@ void setup()
   importMagCalibrationData();
 }
 
+
+// reads and outputs data (loops indefinitely after setup() is finished)
 void loop()
 {
   // get data from GPS
   readGPS();
 
-  // date (ddmmyy), time (hhmmsscc), age of data (milliseconds) stored in variables gpsDate, gpsTime, gpsAge
+  // date, time, and age of data stored in variables gpsDate, gpsTime, gpsAge
   gps.get_datetime(&gpsDate, &gpsTime, &gpsAge);
   
-  // latitude/longitude (millionths of a degree), and age (again for some reason) stored in variables lat, lon, gpsAge
+  // latitude/longitude and age (again for some reason) stored in variables lat, lon, gpsAge
   gps.get_position(&lat, &lon, &gpsAge);
 
   // from time, get hour and minute
@@ -313,7 +329,8 @@ void loop()
   // if the GPS data is not stale (older than 1 second)
   if (gpsAge <= 1000)
   {
-    // if it is midnight (i.e. when a new file is created)
+    // if it is midnight (i.e. when a new file is created), print out file header
+    // this is supposed to put it at the top of the file, although it only works properly when the Raspberry Pi's clock is in perfect sync with the GPS
     if ((index == 0) && (minute != lock_minute))
     {
       lock_minute = minute;
@@ -330,6 +347,20 @@ void loop()
 
 
 //EXTRA MAGNETOMETER METHODS ----------------------------------------------------------------------------
+
+// reads and prints data from magnetometer (B field strength in X, Y, and Z axes in microteslas)
+void readMagnetometer()
+{
+  float x, y, z;
+  
+  mag.readMicroTeslas(&x, &y, &z);
+
+  Serial.print(x);
+  Serial.print(",");
+  Serial.print(y);
+  Serial.print(",");
+  Serial.println(z);
+}
 
 // imports calibration data from bytes 4 through 9
 void importMagCalibrationData()
