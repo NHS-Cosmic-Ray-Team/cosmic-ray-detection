@@ -171,18 +171,7 @@ long readCounter()
 }
 
 
-// prints data from weather sensor: temperature, pressure, humidity
-void barometer()
-{
-  Serial.print(bme.readTemperature());
-  Serial.print(",");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.print(",");
-  Serial.print(bme.readHumidity());
-}
-
-
-// prints out date in the form (yyyymmdd) to the file
+// prints date in the form (yyyymmdd)
 static void print_date(myGPS &gps)
 {
   int year;
@@ -212,11 +201,15 @@ void outputData()
   SPI.transfer(0x20); //clears the CNTR
   digitalWrite(9, HIGH); //end SPI conversation
 
-  //weather sensor
-  barometer();
+  // weather sensor (temperature, pressure, humidity)
+  Serial.print(bme.readTemperature());
+  Serial.print(",");
+  Serial.print(bme.readPressure() / 100.0F);
+  Serial.print(",");
+  Serial.print(bme.readHumidity());
+  Serial.print(",");
 
   // latitude and longitude (converted to degrees)
-  Serial.print(",");
   Serial.print((lat / 1000000.0), 3);// print latitude
   Serial.print(",");
   Serial.print((lon / 1000000.0), 3);
