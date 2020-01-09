@@ -52,21 +52,48 @@ configure MDR1                                        0000 0000 --> 0x00
 #include <SPI.h>
 #include <SoftwareSerial.h>
 
-myBME280 bme; // I2C
+// weather sensor
+myBME280 bme;
+
+// GPS unit
 myGPS gps;
+
 SoftwareSerial ss(8, 7);
 
-unsigned long gpsDate, gpsTime, gpsAge;
-float flat, flon;
+// data from GPS
+unsigned long gpsDate,  // date in the form ddmmyy
+              gpsTime,  // time in the form hhmmsscc (retrieved from the GPS, not the Pi, so make sure they are in PERFECT sync with each other!)
+              gpsAge;   // age of GPS data in milliseconds
+
+
+// latitude and longitude in millionths of a degree (this is how the GPS outputs it)
 long int  lat, lon;
+
+// (unsure) length of time in one pulse of data from GPS
 unsigned long signal_1pps;
+
+// latency in getting data from GPS
 unsigned long latency;
 
+// true if new data was recieved from GPS
 bool newData = false;
+
+// number of cosmic rays counted by scintillators
 signed long count = 0;
-int second = 0,flag = 0, lock_minute = -1, oldSecond = -1, oldMinute = -1;
+
+int second = 0,       // don't know
+    flag = 0,         // flag to delay 50 ms after reading GPS when a 1PPS signal is sent for some reason?
+    lock_minute = -1, // the last minute when data was outputted
+    oldSecond = -1;   // don't know
+
+// header of file, with every field separated by a comma
+const String fileHeader = "Date,Time,Count,TempC,Pressure,Humidity,Lat,Lon,Numsats,FixQ,Latency,V1,V2";
+// if you're adding any sensors, append this header for readability purposes
+
 
 //---------------------------------------Subroutines-------------------------------------
+
+// read a new set of Data from the GPS
 void readGPS()
 {
   while (ss.available()) {
@@ -86,7 +113,9 @@ void readGPS()
   }
 }
 
-void initCounter()  /* initialize the counter */
+
+// initialize the counter
+void initCounter()
 {
   pinMode(9, OUTPUT);
   digitalWrite(9, HIGH);
@@ -100,7 +129,9 @@ void initCounter()  /* initialize the counter */
   digitalWrite(9, HIGH); // bring high to end conversation
 }
 
-long readCounter() /*Reads the Encoders to retrieve the updated value and RETURNS: long */
+
+// Reads the Encoders to retrieve the updated value and RETURNS: long
+long readCounter()
 {
   unsigned int count_1, count_2, count_3, count_4;
   long count_value = 0;
@@ -118,15 +149,8 @@ long readCounter() /*Reads the Encoders to retrieve the updated value and RETURN
   return count_value;
 }
 
-void barometer()  /*subroutine for barometer sensor */
-{
-  Serial.print(bme.readTemperature());
-  Serial.print(",");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.print(",");
-  Serial.print(bme.readHumidity());
-}
 
+// prints date in the form (yyyymmdd)
 static void print_date(myGPS &gps)
 {
   int year;
@@ -139,12 +163,16 @@ static void print_date(myGPS &gps)
     Serial.print(sz);
 }
 
+
+// takes all data from everything and prints it in the file
 void outputData()
 {
+  // date/time
   print_date(gps);
   Serial.print(",");
 
-  count = readCounter(); //calls subroutine to reac the counter
+  // cosmic ray counter
+  count = readCounter(); //calls subroutine to read the counter
   Serial.print(count);
   Serial.print(",");
 
@@ -152,13 +180,21 @@ void outputData()
   SPI.transfer(0x20); //clears the CNTR
   digitalWrite(9, HIGH); //end SPI conversation
 
-  barometer();
-
+  // weather sensor (temperature, pressure, humidity)
+  Serial.print(bme.readTemperature());
   Serial.print(",");
+  Serial.print(bme.readPressure() / 100.0F);
+  Serial.print(",");
+  Serial.print(bme.readHumidity());
+  Serial.print(",");
+
+  // latitude and longitude (converted to degrees)
   Serial.print((lat / 1000000.0), 3);// print latitude
   Serial.print(",");
   Serial.print((lon / 1000000.0), 3);
   Serial.print(",");
+
+  // technical GPS stuff
   Serial.print(gps.satsinview());
   Serial.print(",");
   Serial.print(gps.fix_Quality());
@@ -171,8 +207,11 @@ void outputData()
       ss.print(GPS_5Hz);
   }
   Serial.print(",");
+
+  // auxillary analog voltages
   checkVoltage();
 
+  // I don't know what this does
   oldSecond = second;
 }
 
@@ -182,9 +221,11 @@ void one_pps()
   flag = 0;
 }
 
-void checkVoltage() // Analog to Digital Converter
+
+// prints auxillary voltages on analog pins 0 and 1 (use this for any analog sensors)
+void checkVoltage()
 {
-  // read the input on analog pin 0:
+  // read the input on analog pins 0 and 1:
   int analogValue1 = analogRead(A0);
   int analogValue2 = analogRead(A1);
   // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V):
@@ -196,6 +237,8 @@ void checkVoltage() // Analog to Digital Converter
   Serial.println(voltage2); 
 }
 
+
+// initializes all sensors and such (runs once when Arduino starts up)
 void setup()
 {
   Serial.begin(9600);
@@ -214,32 +257,44 @@ void setup()
     while (1);
   }
   pinMode(10, OUTPUT);
-  Serial.println("Date,Time,Count,TempC,Pressure,Humidity,Lat,Lon,Numsats,FixQ,Latency,V1,V2");
+  Serial.println(fileHeader);
   attachInterrupt(0, one_pps, RISING); //1PPS signal to pin 2, rising signal.
 }
 
+
+// reads and outputs data (loops indefinitely after setup() is finished)
 void loop()
 {
+  // get data from GPS
   readGPS();
+
+  // date, time, and age of data stored in variables gpsDate, gpsTime, gpsAge
   gps.get_datetime(&gpsDate, &gpsTime, &gpsAge);
+  
+  // latitude/longitude and age (again for some reason) stored in variables lat, lon, gpsAge
   gps.get_position(&lat, &lon, &gpsAge);
+
+  // from time, get hour and minute
+  // ex: if gpsTime = 231700, minute = 17 and hour = 23
   int minute = (gpsTime / 10000) % 100;
   int hour = gpsTime / 1000000;
+
+  // index of data points, signified by the minutes after midnight
   int index = (hour * 60) + minute;
 
-  if (gpsAge <= 1000) //To test whether the data returned is stale: fix_age returns the number of milliseconds since the data was encoded.
+  // if the GPS data is not stale (older than 1 second) and a minute has passed since last data point was written
+  if ((gpsAge <= 1000) && (minute != lock_minute))
   {
-    if ((index == 0) && (minute != lock_minute)) //check that it's midnight
+    lock_minute = minute;
+
+    // if it is midnight (i.e. when a new file is created), print out file header
+    // this is supposed to put it at the top of the file, although it only works properly when the Raspberry Pi's clock is in perfect sync with the GPS
+    if ((index == 0) )
     {
-      lock_minute = minute;
-      Serial.println("Date,Time,Count,TempC,Pressure,Humidity,Lat,Lon,Numsats,FixQ,Latency,V1,V2");
-      outputData();
+      Serial.println(fileHeader);
     }
-    if ((index % 1 == 0) && (minute != lock_minute)) //check that minute is 5
-    {
-      lock_minute = minute;
-      outputData();
-    }
+
+    outputData();
   }
 }
 
